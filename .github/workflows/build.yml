@@ -12,11 +12,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Gradle
-        run: sudo apt-get update && sudo apt-get install gradle -y
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Gradle 8
+        run: |
+          wget https://services.gradle.org/distributions/gradle-8.2-bin.zip
+          unzip gradle-8.2-bin.zip
+          export PATH=$PWD/gradle-8.2/bin:$PATH
+          gradle -v
 
       - name: Build APK
-        run: gradle assembleDebug
+        run: |
+          export PATH=$PWD/gradle-8.2/bin:$PATH
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
