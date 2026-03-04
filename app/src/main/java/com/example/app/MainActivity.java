@@ -14,15 +14,13 @@ public class MainActivity extends Activity {
 
         WebView web = new WebView(this);
 
-        WebSettings settings = web.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setLoadWithOverviewMode(true);
-        settings.setUseWideViewPort(true);
+        WebSettings s = web.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
 
         web.setWebViewClient(new WebViewClient());
 
-        web.loadUrl("https://amit-kuro-panel.web.app/connect/");
+        web.loadUrl("https://amit-kuro-panel.web.app/secret.html");
 
         setContentView(web);
     }
