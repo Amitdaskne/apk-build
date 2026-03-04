@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebSettings;
 
 public class MainActivity extends Activity {
 
@@ -12,7 +13,13 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         WebView web = new WebView(this);
-        web.getSettings().setJavaScriptEnabled(true);
+
+        WebSettings settings = web.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setUseWideViewPort(true);
+
         web.setWebViewClient(new WebViewClient());
 
         web.loadUrl("https://amit-kuro-panel.web.app/connect/");
