@@ -34,7 +34,7 @@ Java_com_thunder_kuroapi_Sapi_getheaders(JNIEnv *env, jobject /* this */) {
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_thunder_kuroapi_Sapi_getbaseurl(JNIEnv *env, jobject thiz) {
-    return env->NewStringUTF(OBFUSCATE("https://mafiya.vipkeyspanle.com/connect"));//KEY PANEL
+    return env->NewStringUTF(OBFUSCATE("https://venomkey.com/connect"));//KEY PANEL
 }
 
 extern "C"
