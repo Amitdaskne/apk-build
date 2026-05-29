@@ -1,0 +1,475 @@
+package com.thunder.ui.screens
+
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.thunder.LOGS
+import com.thunder.R
+import com.thunder.kuroapi.KuroApi
+import com.thunder.kuroapi.Sapi
+import com.thunder.utils.PrefsManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+
+@Composable
+fun LoginScreen(navController: NavController) {
+    val context = LocalContext.current
+    var keyText by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isAutoLoggingIn by remember { mutableStateOf(false) }
+    
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Animation states
+    val cardAlpha = remember { Animatable(0f) }
+    val cardScale = remember { Animatable(0.9f) }
+    
+    val visibilityOn = painterResource(R.drawable.visibility_24px)
+    val visibilityOff = painterResource(R.drawable.visibility_off_24px)
+
+    LaunchedEffect(Unit) {
+        // Animate card entrance
+        launch {
+            cardAlpha.animateTo(1f, animationSpec = tween(600))
+        }
+        launch {
+            cardScale.animateTo(1f, animationSpec = tween(600, delayMillis = 100))
+        }
+        
+        delay(300)
+        
+        // Check if user is already logged in with saved key
+        if (PrefsManager.isLoggedIn(context)) {
+            val savedKey = PrefsManager.getLicenseKey(context)
+            if (!savedKey.isNullOrBlank()) {
+                LOGS.info("Found saved session, auto-logging in...")
+                isAutoLoggingIn = true
+                keyText = savedKey
+                
+                // Auto-login with saved key
+                handleLogin(savedKey, navController, coroutineScope, context) { loading, error ->
+                    isLoading = loading
+                    isAutoLoggingIn = loading
+                    errorMessage = error
+                    
+                    // If auto-login fails, clear the session
+                    if (error != null) {
+                        PrefsManager.clearSession(context)
+                    }
+                }
+            }
+        } else {
+            // Load saved key but don't auto-login
+            val savedKey = PrefsManager.getLicenseKey(context)
+            if (!savedKey.isNullOrBlank()) {
+                keyText = savedKey
+            }
+            focusRequester.requestFocus()
+        }
+    }
+
+    // Lottie Animation
+    val lottieComposition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(R.raw.loginscreenanimation)
+    )
+    
+    Box(modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                )
+            )
+    ) {
+        // Animated background elements
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(0.15f)
+        ) {
+            LottieAnimation(
+                composition = lottieComposition,
+                iterations = LottieConstants.IterateForever,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        
+        // Main content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Lottie Animation at top
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .alpha(cardAlpha.value)
+                    .scale(cardScale.value),
+                contentAlignment = Alignment.Center
+            ) {
+                LottieAnimation(
+                    composition = lottieComposition,
+                    iterations = LottieConstants.IterateForever,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            // Main content card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .scale(cardScale.value)
+                    .alpha(cardAlpha.value),
+                shape = RoundedCornerShape(32.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // Professional Header
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "Welcome Back",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            letterSpacing = 0.5.sp
+                        )
+                        
+                        Text(
+                            text = "Enter your license key to continue",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Enhanced Key Input Field
+                    OutlinedTextField(
+                        value = keyText,
+                        onValueChange = { 
+                            keyText = it
+                            errorMessage = null
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        label = { 
+                            Text(
+                                text = "License Key",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        },
+                        placeholder = { 
+                            Text(
+                                text = "Enter your license key",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                keyboardController?.hide()
+                                handleLogin(keyText, navController, coroutineScope, context) { loading, error ->
+                                    isLoading = loading
+                                    errorMessage = error
+                                }
+                            }
+                        ),
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_lock_id_lock),
+                                contentDescription = "Key icon",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { passwordVisible = !passwordVisible },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    painter = if (passwordVisible) visibilityOn else visibilityOff,
+                                    contentDescription = if (passwordVisible) "Hide key" else "Show key",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            cursorColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+
+                    // Error Message with smooth animation
+                    AnimatedVisibility(
+                        visible = errorMessage != null,
+                        enter = expandVertically(
+                            animationSpec = tween(300),
+                            expandFrom = Alignment.Top
+                        ) + fadeIn(animationSpec = tween(300)),
+                        exit = shrinkVertically(
+                            animationSpec = tween(300),
+                            shrinkTowards = Alignment.Top
+                        ) + fadeOut(animationSpec = tween(300))
+                    ) {
+                        errorMessage?.let { error ->
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.errorContainer
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.error_24px),
+                                        contentDescription = "Error",
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = error,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Enhanced Login Button with gradient effect
+                    Button(
+                        onClick = {
+                            keyboardController?.hide()
+                            handleLogin(keyText, navController, coroutineScope, context) { loading, error ->
+                                isLoading = loading
+                                errorMessage = error
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(58.dp),
+                        enabled = keyText.isNotBlank() && !isLoading && !isAutoLoggingIn,
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 6.dp,
+                            pressedElevation = 10.dp,
+                            disabledElevation = 0.dp
+                        )
+                    ) {
+                        if (isLoading || isAutoLoggingIn) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 3.dp
+                                )
+                                Text(
+                                    text = if (isAutoLoggingIn) "Auto-logging in..." else "Verifying...",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        } else {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Continue",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowForward,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Help text with better styling
+                    TextButton(
+                        onClick = { /* TODO: Open support */ },//ADD TG LINK
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Text(
+                            text = "Don't have a key? Contact support",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun handleLogin(
+    key: String,
+    navController: NavController,
+    coroutineScope: CoroutineScope,
+    context: android.content.Context,
+    onStateChange: (Boolean, String?) -> Unit
+) {
+    if (key.isBlank()) {
+        onStateChange(false, "Please enter a valid key")
+        return
+    }
+
+    // Start loading
+    onStateChange(true, null)
+    
+    // Authenticate with KuroApi
+    coroutineScope.launch {
+        try {
+            // Initialize KuroApi with user key
+            val loginurl = Sapi.getbaseurl()
+
+
+            val kuroApi = KuroApi(
+                userkey = key,
+                baseurl = loginurl,
+                Lisence = "Vm8Lk7Uj2JmsjCPVPVjrLa7zgfx3uz9E" // Your app license key
+            )
+            
+            LOGS.info("Authenticating with key: $key")
+            
+            // Validate user
+            val isValid = kuroApi.IsUSerValaid()
+            
+            if (isValid) {
+                LOGS.info("Authentication successful!")
+                
+                // Fetch user database/profile
+                val database = kuroApi.getDatabase()
+                
+                if (database != null && database.status == true) {
+                    LOGS.info("User data loaded: ${database.data?.appName}")
+
+                        // Save license key for next time
+                        PrefsManager.saveLicenseKey(context, key)
+                        PrefsManager.setLoggedIn(context, true)
+                        
+                        // Save user data (optional)
+                        PrefsManager.saveUserData(
+                            context,
+                            database.data?.appName,
+                        //    database.data?.expired_date
+                        )
+                        
+                        LOGS.info("License key saved to preferences")
+                        onStateChange(false, null)
+                        
+                        // Navigate to home
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                } else {
+                    val reason = database?.reason ?: "Unknown error"
+                    onStateChange(false, "Login failed: $reason")
+
+                }
+            } else {
+                LOGS.error("Authentication failed - Invalid key")
+                onStateChange(false, "Invalid license key. Please check and try again.")
+            }
+        } catch (e: Exception) {
+            LOGS.error("Login error: ${e.message}")
+            e.printStackTrace()
+            onStateChange(false, "Network error: ${e.message ?: "Unable to connect to server"}")
+        }
+    }
+}
